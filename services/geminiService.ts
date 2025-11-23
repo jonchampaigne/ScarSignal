@@ -1,9 +1,6 @@
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { StorySegment } from "../types";
 
-// Initialize the client. API_KEY is expected to be in the environment.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
 const STORY_MODEL = "gemini-2.5-flash";
 const IMAGE_MODEL = "gemini-2.5-flash-image";
 const TTS_MODEL = "gemini-2.5-flash-preview-tts";
@@ -40,6 +37,9 @@ export const generateNextStorySegment = async (
   currentStats: { health: number; wealth: number; xp: number }
 ): Promise<StorySegment> => {
   
+  // Initialize client here to ensure we capture the key after login
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
   // We only send the last 2 segments to save context, but summarize the start
   const recentHistory = history.slice(-2).map(h => `Narrative: ${h.narrative}`).join("\n\n");
   
@@ -118,6 +118,8 @@ export const generateNextStorySegment = async (
  * Generates an image based on the scene description.
  */
 export const generateSceneImage = async (visualPrompt: string): Promise<string> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  
   // Enforcing realism and 2025 tech look with specific camera and texture prompts
   const enhancedPrompt = `Photorealistic, 8k, Unreal Engine 5 render, tangible 2025 technology, grime, macro photography, cinematic lighting, depth of field: ${visualPrompt}`;
 
@@ -144,6 +146,8 @@ export const generateSceneImage = async (visualPrompt: string): Promise<string> 
  * Generates speech audio from the narrative text.
  */
 export const generateNarrativeAudio = async (text: string): Promise<string> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
   const response = await ai.models.generateContent({
     model: TTS_MODEL,
     contents: {

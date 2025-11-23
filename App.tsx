@@ -209,7 +209,7 @@ function App() {
         ))}
 
         {/* Stats HUD (Top Left Overlay) */}
-        <div className="absolute top-4 left-4 z-30 flex flex-col space-y-2 bg-black/60 p-2 border border-amber-900/30 backdrop-blur-sm rounded-sm">
+        <div className="absolute top-4 left-4 z-30 flex flex-col space-y-2 bg-black/60 p-2 border border-amber-900/30 backdrop-blur-sm rounded-sm transition-transform duration-300 hover:scale-110 origin-top-left cursor-default">
              <div className="flex items-center space-x-3 text-amber-500 font-terminal text-xs tracking-wider">
                <span className="w-16">VITALS</span>
                <div className="h-1.5 w-24 bg-stone-800 border border-stone-600">
@@ -230,7 +230,7 @@ function App() {
         {/* Visual Log Footer */}
         <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black via-black/80 to-transparent z-20">
            {currentSegment && (
-             <div className="border-l-2 border-amber-600 pl-3">
+             <div className="border-l-2 border-amber-600 pl-3 transition-transform duration-300 origin-bottom-left hover:scale-110 cursor-default">
                <p className="text-[10px] text-amber-700 font-terminal uppercase tracking-widest mb-1">
                  Visual Feed {activeImageIndex + 1}/{imageUrls.length}
                </p>
