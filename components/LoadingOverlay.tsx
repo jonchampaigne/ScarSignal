@@ -6,14 +6,9 @@ interface LoadingOverlayProps {
 }
 
 const LoadingOverlay: React.FC<LoadingOverlayProps> = ({ stage }) => {
-  if (stage === LoadingStage.IDLE) return null;
-
-  const messages = {
-    [LoadingStage.WRITING]: "SPLICING NARRATIVE TAPE...",
-    [LoadingStage.PAINTING]: "RENDERING ANALOG SIGNAL...",
-    [LoadingStage.VOICING]: "SYNTHESIZING VOCAL TRACK...",
-    [LoadingStage.IDLE]: ""
-  };
+  // Only show overlay for critical blocking stages (Writing)
+  // Painting and Voicing happen in background now.
+  if (stage !== LoadingStage.WRITING) return null;
 
   return (
     <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/90 backdrop-blur-md crt transition-all duration-300">
@@ -24,12 +19,12 @@ const LoadingOverlay: React.FC<LoadingOverlayProps> = ({ stage }) => {
         </div>
         
         <div className="flex justify-between items-center text-amber-500 font-terminal text-sm">
-            <span className="animate-pulse">PROCESSING...</span>
-            <span className="font-mono">SYS.V1.4</span>
+            <span className="animate-pulse">PROCESSING INPUT...</span>
+            <span className="font-mono">SYS.V1.5</span>
         </div>
 
         <p className="mt-8 text-center text-amber-500 font-terminal tracking-widest text-xl uppercase glitch-text">
-          {messages[stage]}
+          SPLICING NARRATIVE TAPE...
         </p>
       </div>
     </div>

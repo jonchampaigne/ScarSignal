@@ -12,13 +12,17 @@
         --crt-scanline: rgba(18, 16, 16, 0.1);
         --phosphor-amber: #ffb000;
         --phosphor-dim: #b36b00;
+        --term-bg: #050505;
+        --term-user: #00ff9d; /* Kali Green */
+        --term-host: #bd93f9; /* Dracula Purple */
+        --term-path: #6272a4;
       }
 
       body {
         font-family: 'Share Tech Mono', monospace;
-        background-color: #050505;
+        background-color: var(--term-bg);
         color: #e2e8f0;
-        overflow-x: hidden;
+        overflow: hidden; /* Prevent body scroll, handle in app */
       }
       
       .font-analog {
@@ -48,25 +52,85 @@
         pointer-events: none;
       }
 
+      .crt::after {
+        content: " ";
+        display: block;
+        position: absolute;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        right: 0;
+        background: rgba(18, 16, 16, 0.1);
+        opacity: 0;
+        z-index: 50;
+        pointer-events: none;
+        animation: flicker 0.15s infinite;
+      }
+
+      @keyframes flicker {
+        0% { opacity: 0.027906; }
+        5% { opacity: 0.048902; }
+        10% { opacity: 0.023485; }
+        15% { opacity: 0.014865; }
+        20% { opacity: 0.019343; }
+        25% { opacity: 0.021945; }
+        30% { opacity: 0.017983; }
+        35% { opacity: 0.038482; }
+        40% { opacity: 0.024285; }
+        45% { opacity: 0.034823; }
+        50% { opacity: 0.012395; }
+        55% { opacity: 0.015483; }
+        60% { opacity: 0.028943; }
+        65% { opacity: 0.011934; }
+        70% { opacity: 0.035483; }
+        75% { opacity: 0.029482; }
+        80% { opacity: 0.013953; }
+        85% { opacity: 0.014823; }
+        90% { opacity: 0.019385; }
+        95% { opacity: 0.015482; }
+        100% { opacity: 0.017942; }
+      }
+
+      /* Phosphor Text Effect (90s Console) */
+      .text-phosphor {
+        color: var(--phosphor-amber);
+        text-shadow: 0 0 2px var(--phosphor-dim), 0 0 8px rgba(255, 176, 0, 0.4);
+      }
+
+      .text-neon-green {
+        color: var(--term-user);
+        text-shadow: 0 0 5px rgba(0, 255, 157, 0.5);
+      }
+      
+      .text-neon-purple {
+        color: var(--term-host);
+        text-shadow: 0 0 5px rgba(189, 147, 249, 0.5);
+      }
+
       /* Custom Scrollbar */
       ::-webkit-scrollbar {
-        width: 10px;
-        background: #0f0f0f;
+        width: 8px;
+        background: #000;
       }
       ::-webkit-scrollbar-track {
-        border-left: 1px solid #333;
+        border-left: 1px solid #111;
       }
       ::-webkit-scrollbar-thumb {
-        background: #b36b00; 
+        background: #333; 
         border: 1px solid #000;
       }
       ::-webkit-scrollbar-thumb:hover {
-        background: #ffb000; 
+        background: var(--phosphor-dim); 
       }
 
       /* Terminal Cursor */
       .cursor-blink {
+        display: inline-block;
+        width: 8px;
+        height: 1.2em;
+        background-color: var(--phosphor-amber);
         animation: blink 1s step-end infinite;
+        vertical-align: middle;
       }
       @keyframes blink {
         0%, 100% { opacity: 1; }
@@ -81,6 +145,17 @@
       }
       .animate-shake {
         animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+      }
+
+      /* Cyberdeck Panel Styling */
+      .cyber-panel {
+        background: rgba(10, 10, 10, 0.95);
+        border: 1px solid #333;
+        box-shadow: 0 0 10px rgba(0,0,0,0.5);
+      }
+
+      .cyber-border-bottom {
+        border-bottom: 1px solid #333;
       }
     </style>
   <script type="importmap">
