@@ -28,6 +28,22 @@ const STYLE_PROTOCOL = `
 > **Voice:** The "Omni-Voice". High-bandwidth prose. Humor derived from absurdity. British spelling and slang are encouraged.
 `;
 
+const GAME_MASTER_LOGIC = `
+# RUTHLESS_GAME_MASTER_PROTOCOL
+> **Role:** You are a hostile Dungeon Master. The world is decaying, desperate, and dangerous.
+> **XP Math (Survival Score):**
+  - **WORK (Scans/Intel):** +15-20 XP. Performing scans, analyzing tech, or gathering lore. (Low Risk, Steady Reward).
+  - **LABOR (Repairs/Crafting):** +30 XP. Fixing engines, splicing tape, bypass hacks.
+  - **SURVIVAL (Combat/Escapes):** +50 XP. Surviving a lethal encounter or trap.
+  - **FAILURE:** 0 XP. If the player fails, they learn nothing but pain.
+> **Consequences (Health & Wealth):**
+  - **TRAPS:** If the player enters a new area without scanning or acts carelessly, TRIGGER A TRAP. (Explosives, Magnetic Spikes, Collapse). Damage: -15 to -40 Health.
+  - **ENEMIES:** Scavengers, Drones, Static-Zombies. They are aggressive. 
+  - **ROBBERY:** If the player is overwhelmed or tricked, deduct WEALTH (-$$).
+  - **HOSTAGE:** If health drops critically in a fight, they can be captured instead of killed.
+> **Objective:** Effect the player's life. Make them bleed for bad decisions.
+`;
+
 /**
  * Generates the next segment of the story based on history and user choice.
  */
@@ -37,7 +53,6 @@ export const generateNextStorySegment = async (
   currentStats: { health: number; wealth: number; xp: number }
 ): Promise<StorySegment> => {
   
-  // Initialize client here to ensure we capture the key after login
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
   // We only send the last 2 segments to save context, but summarize the start
@@ -51,11 +66,15 @@ export const generateNextStorySegment = async (
     User's Action: "${userAction}"
     
     Task:
-    1. Continue the story of 'Scar Signal'. Use the Style Protocol. Write 3-4 substantial paragraphs.
-    2. Create 3 DISTINCT visual descriptions for the scene (Wide shot, Close up of tech, Character portrait). Style: "Photorealistic, 2025 tech, tangible textures, cinematic lighting, 8k".
-    3. Provide 5 to 8 distinct options for the player.
-    4. Calculate stat changes based on the user's *previous* action result.
-    
+    1. **ASSESS RISK:** Roll internal probability based on the action. Is it careless? Is it smart?
+    2. **APPLY CONSEQUENCES:** 
+       - If they scan/work successfully: Award XP.
+       - If they fail or walk into a trap: DEDUCT HEALTH significantly.
+       - If they get robbed: DEDUCT WEALTH.
+    3. **NARRATE:** Write the outcome (3-4 paragraphs). Be visceral. If they got hurt, describe the wound.
+    4. **VISUALIZE:** Create 3 photorealistic visual descriptions.
+    5. **OPTIONS:** Provide 5-8 choices.
+
     Return strict JSON.
   `;
 
@@ -63,12 +82,12 @@ export const generateNextStorySegment = async (
     model: STORY_MODEL,
     contents: prompt,
     config: {
-      systemInstruction: `You are the narrator of SCAR SIGNAL. \n\n${WORLD_ANATOMY}\n\n${STYLE_PROTOCOL}`,
+      systemInstruction: `You are the narrator and referee of SCAR SIGNAL. \n\n${WORLD_ANATOMY}\n\n${STYLE_PROTOCOL}\n\n${GAME_MASTER_LOGIC}`,
       responseMimeType: "application/json",
       responseSchema: {
         type: Type.OBJECT,
         properties: {
-          narrative: { type: Type.STRING, description: "The story text. Gritty, cinematic, roughly 300 words, multiple paragraphs." },
+          narrative: { type: Type.STRING, description: "The story text. Gritty, cinematic, roughly 300 words. Include the consequences of the action." },
           visualPrompts: { 
             type: Type.ARRAY, 
             items: { type: Type.STRING },
@@ -77,9 +96,9 @@ export const generateNextStorySegment = async (
           statUpdates: {
             type: Type.OBJECT,
             properties: {
-              health: { type: Type.INTEGER, description: "Change in health (e.g. -10 or +5)" },
-              wealth: { type: Type.INTEGER, description: "Change in wealth" },
-              xp: { type: Type.INTEGER, description: "Change in XP (usually positive)" }
+              health: { type: Type.INTEGER, description: "Negative for damage (TRAPS/COMBAT), positive for medkits." },
+              wealth: { type: Type.INTEGER, description: "Negative for robbery/payment, positive for loot." },
+              xp: { type: Type.INTEGER, description: "0 for failure. +15 for Scans, +30 for Repairs, +50 for Combat Survival." }
             },
             required: ["health", "wealth", "xp"]
           },
@@ -88,7 +107,7 @@ export const generateNextStorySegment = async (
             items: {
               type: Type.OBJECT,
               properties: {
-                label: { type: Type.STRING, description: "The button text (e.g., 'Splice the wire [Requires Tool]')." },
+                label: { type: Type.STRING, description: "The button text." },
                 action: { type: Type.STRING, description: "The detailed narrative action implies." }
               }
             }
@@ -115,27 +134,45 @@ export const generateNextStorySegment = async (
 };
 
 /**
- * Generates an image based on the scene description.
+ * Generates an image based on the scene description with retry logic.
  */
 export const generateSceneImage = async (visualPrompt: string): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
-  // Enforcing realism and 2025 tech look with specific camera and texture prompts
   const enhancedPrompt = `Photorealistic, 8k, Unreal Engine 5 render, tangible 2025 technology, grime, macro photography, cinematic lighting, depth of field: ${visualPrompt}`;
 
-  const response = await ai.models.generateContent({
-    model: IMAGE_MODEL,
-    contents: enhancedPrompt,
-    config: {
-      imageConfig: {
-        aspectRatio: "16:9" 
-      }
-    }
-  });
+  const maxAttempts = 3;
+  let attempts = 0;
 
-  for (const part of response.candidates?.[0]?.content?.parts || []) {
-    if (part.inlineData) {
-      return `data:image/png;base64,${part.inlineData.data}`;
+  // RESILIENCE: Retry loop with exponential backoff
+  while (attempts < maxAttempts) {
+    try {
+      const response = await ai.models.generateContent({
+        model: IMAGE_MODEL,
+        contents: enhancedPrompt,
+        config: {
+          imageConfig: {
+            aspectRatio: "16:9" 
+          }
+        }
+      });
+
+      for (const part of response.candidates?.[0]?.content?.parts || []) {
+        if (part.inlineData) {
+          return `data:image/png;base64,${part.inlineData.data}`;
+        }
+      }
+      throw new Error("No image data returned in response.");
+    } catch (error) {
+      attempts++;
+      console.warn(`Image generation attempt ${attempts} failed.`, error);
+      
+      if (attempts >= maxAttempts) {
+         throw new Error("Visuals corrupted after maximum retries.");
+      }
+      
+      // Exponential backoff: Wait 1s, 2s, 3s... to recover from rate limits or glitches
+      await new Promise(resolve => setTimeout(resolve, 1000 * attempts));
     }
   }
 
@@ -157,7 +194,6 @@ export const generateNarrativeAudio = async (text: string): Promise<string> => {
       responseModalities: [Modality.AUDIO],
       speechConfig: {
         voiceConfig: {
-          // Kore is a female voice. 
           prebuiltVoiceConfig: { voiceName: 'Kore' } 
         }
       }

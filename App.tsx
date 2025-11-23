@@ -19,6 +19,7 @@ function App() {
   const [hasStarted, setHasStarted] = useState(false);
   const [customInput, setCustomInput] = useState("");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isDamaged, setIsDamaged] = useState(false);
 
   // Stats
   const [stats, setStats] = useState<PlayerStats>({
@@ -39,6 +40,14 @@ function App() {
     }, 8000); // Rotate image every 8 seconds
     return () => clearInterval(interval);
   }, [imageUrls]);
+
+  // Remove damage flash after animation
+  useEffect(() => {
+    if (isDamaged) {
+      const timer = setTimeout(() => setIsDamaged(false), 500);
+      return () => clearTimeout(timer);
+    }
+  }, [isDamaged]);
 
   const initAudio = () => {
     if (!audioContextRef.current) {
@@ -92,29 +101,54 @@ function App() {
       setLoadingStage(LoadingStage.WRITING);
       const nextSegment = await generateNextStorySegment(history, action, stats);
       
-      // Update Stats
+      // Update Stats & Check for Damage
       if (nextSegment.statUpdates) {
-        setStats(prev => ({
-          health: Math.min(100, Math.max(0, prev.health + (nextSegment.statUpdates?.health || 0))),
-          wealth: Math.max(0, prev.wealth + (nextSegment.statUpdates?.wealth || 0)),
-          xp: prev.xp + (nextSegment.statUpdates?.xp || 0)
-        }));
+        setStats(prev => {
+          const healthChange = nextSegment.statUpdates?.health || 0;
+          if (healthChange < 0) {
+            setIsDamaged(true);
+          }
+          return {
+            health: Math.min(100, Math.max(0, prev.health + healthChange)),
+            wealth: Math.max(0, prev.wealth + (nextSegment.statUpdates?.wealth || 0)),
+            xp: prev.xp + (nextSegment.statUpdates?.xp || 0)
+          };
+        });
       }
 
       setCurrentSegment(nextSegment);
       setHistory(prev => [...prev, nextSegment]);
       
+      // If dead, stop processing images/audio to save resources/time and show death screen immediately
+      if ((stats.health + (nextSegment.statUpdates?.health || 0)) <= 0) {
+         setLoadingStage(LoadingStage.IDLE);
+         return; 
+      }
+
       setLoadingStage(LoadingStage.PAINTING);
       
       // Generate 3 images in parallel for the carousel
       try {
         const prompts = nextSegment.visualPrompts.slice(0, 3); // Take up to 3
         const imagePromises = prompts.map(p => generateSceneImage(p));
-        const images = await Promise.all(imagePromises);
-        setImageUrls(images);
-        setActiveImageIndex(0);
+        
+        // Use allSettled so one failure doesn't kill the batch. 
+        // Logic: Try to get all 3, if some fail, just use the successful ones.
+        const results = await Promise.allSettled(imagePromises);
+        const validImages = results
+          .filter((r: any) => r.status === 'fulfilled')
+          .map((r: any) => r.value as string);
+
+        if (validImages.length > 0) {
+            setImageUrls(validImages);
+            setActiveImageIndex(0);
+        } else {
+            // If ALL fail, we might want to keep the old ones or show an error state
+            // For now, keeping old ones is safer than blank screen
+             console.warn("All image generations failed. Retaining previous buffer.");
+        }
       } catch (e) {
-        console.warn("Image generation failed", e);
+        console.warn("Image generation system critical failure", e);
       }
 
       setLoadingStage(LoadingStage.VOICING);
@@ -189,10 +223,43 @@ function App() {
     );
   }
 
+  // DEATH SCREEN
+  if (stats.health <= 0) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-black relative overflow-hidden font-terminal crt">
+        <div className="absolute inset-0 bg-red-900/20 z-0 animate-pulse"></div>
+        <div className="z-10 text-center border-2 border-red-800 p-12 bg-black/90 max-w-2xl mx-4">
+           <h1 className="text-6xl text-red-600 font-analog mb-4 glitch-text">SIGNAL LOST</h1>
+           <p className="text-red-400 font-mono mb-8 text-xl">BIO-SIGNS FLATLINED. NARRATIVE TERMINATED.</p>
+           
+           <div className="flex justify-center space-x-8 mb-8 text-stone-500 font-mono text-sm">
+             <div>
+               <span className="block text-stone-700">FINAL XP</span>
+               <span className="text-amber-600 text-lg">{stats.xp}</span>
+             </div>
+             <div>
+               <span className="block text-stone-700">WEALTH</span>
+               <span className="text-amber-600 text-lg">{stats.wealth}</span>
+             </div>
+           </div>
+
+           <button 
+             onClick={exitGame}
+             className="px-8 py-3 bg-red-900/20 border border-red-600 text-red-500 hover:bg-red-900/40 hover:text-red-300 transition-all"
+           >
+             REBOOT SYSTEM
+           </button>
+        </div>
+      </div>
+    );
+  }
+
   // Main Interface
   return (
-    <div className="min-h-screen bg-[#050505] flex flex-col md:flex-row relative crt text-[#e2e8f0]">
-      
+    <div className={`min-h-screen bg-[#050505] flex flex-col md:flex-row relative crt text-[#e2e8f0] transition-colors duration-100 ${isDamaged ? 'bg-red-900/30 animate-shake' : ''}`}>
+      {/* Damage Overlay Flash */}
+      <div className={`absolute inset-0 z-50 pointer-events-none bg-red-600 mix-blend-overlay transition-opacity duration-300 ${isDamaged ? 'opacity-40' : 'opacity-0'}`}></div>
+
       {/* Visual Canvas (Left) */}
       <div className="w-full md:w-1/2 h-[40vh] md:h-screen relative bg-black border-b md:border-b-0 md:border-r border-[#333] overflow-hidden">
         <LoadingOverlay stage={loadingStage} />
@@ -209,13 +276,13 @@ function App() {
         ))}
 
         {/* Stats HUD (Top Left Overlay) */}
-        <div className="absolute top-4 left-4 z-30 flex flex-col space-y-2 bg-black/60 p-2 border border-amber-900/30 backdrop-blur-sm rounded-sm transition-transform duration-300 hover:scale-110 origin-top-left cursor-default">
+        <div className="absolute top-4 left-4 z-30 flex flex-col space-y-2 bg-black/60 p-2 border border-amber-900/30 backdrop-blur-sm rounded-sm transition-all duration-300 hover:scale-110 hover:bg-black/80 hover:border-amber-500 hover:shadow-[0_0_20px_rgba(245,158,11,0.2)] origin-top-left cursor-default group">
              <div className="flex items-center space-x-3 text-amber-500 font-terminal text-xs tracking-wider">
                <span className="w-16">VITALS</span>
                <div className="h-1.5 w-24 bg-stone-800 border border-stone-600">
-                 <div className="h-full bg-amber-600" style={{ width: `${stats.health}%` }}></div>
+                 <div className={`h-full transition-all duration-500 ${stats.health < 30 ? 'bg-red-600 animate-pulse' : 'bg-amber-600'}`} style={{ width: `${stats.health}%` }}></div>
                </div>
-               <span>{stats.health}%</span>
+               <span className={stats.health < 30 ? 'text-red-500 font-bold' : ''}>{stats.health}%</span>
              </div>
              <div className="flex items-center space-x-3 text-amber-500 font-terminal text-xs tracking-wider">
                <span className="w-16">CREDITS</span>
@@ -223,14 +290,14 @@ function App() {
              </div>
              <div className="flex items-center space-x-3 text-amber-500 font-terminal text-xs tracking-wider">
                <span className="w-16">XP</span>
-               <span className="text-stone-300">{stats.xp}</span>
+               <span className="text-stone-300 group-hover:text-amber-100 transition-colors">{stats.xp}</span>
              </div>
         </div>
         
         {/* Visual Log Footer */}
         <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black via-black/80 to-transparent z-20">
            {currentSegment && (
-             <div className="border-l-2 border-amber-600 pl-3 transition-transform duration-300 origin-bottom-left hover:scale-110 cursor-default">
+             <div className="border-l-2 border-amber-600 pl-3 transition-all duration-300 origin-bottom-left hover:scale-110 hover:border-amber-400 hover:pl-4 cursor-default">
                <p className="text-[10px] text-amber-700 font-terminal uppercase tracking-widest mb-1">
                  Visual Feed {activeImageIndex + 1}/{imageUrls.length}
                </p>

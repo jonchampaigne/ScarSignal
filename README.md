@@ -18,7 +18,7 @@ Scar Signal is an infinite, AI-generated text adventure set in a gritty, magneti
 *   **Vitals (HUD):**
     *   **Health:** Your physical condition. Reaching 0% terminates the signal.
     *   **Credits:** Currency for trade and bribes.
-    *   **XP:** Experience gained from surviving and solving problems.
+    *   **XP:** Survival Score. Gained by working, scanning, and surviving combat.
 
 ### Controls
 *   **Options:** Select one of the numbered protocols (01-08) to advance the story.
@@ -35,9 +35,16 @@ The game uses Google's Gemini API as a dynamic "Game Master":
 *   **Visuals:** Generates 3 distinct photorealistic 8k images per turn (Wide Shot, Tech Detail, Character) using `gemini-2.5-flash-image`.
 *   **Audio:** Synthesizes a British female voice ('Kore') for narration using `gemini-2.5-flash-preview-tts`.
 
-### Game Rules
+### Game Rules & XP Math
 *   **Smart Tech is Death:** In this world, SSDs and neural processors attract "The Static". Use magnetic tape and analog gear.
-*   **Consequences:** Every choice affects your Health, Wealth, or XP.
+*   **XP (Experience):** 
+    *   **Scans & Intel:** +15 XP (Low Risk)
+    *   **Repairs & Labor:** +30 XP (Medium Risk)
+    *   **Combat Survival:** +50 XP (High Risk)
+    *   **Failure:** 0 XP.
+*   **Consequences:** 
+    *   **Traps:** Carelessness triggers traps (-20 Health).
+    *   **Enemies:** Bandits will rob you (-Credits) or kill you (-Health).
 *   **Permadeath:** If your Health hits 0, the narrative ends. You must Terminate and restart.
 
 ---
