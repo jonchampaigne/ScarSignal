@@ -400,6 +400,10 @@ function App() {
     try {
       const nextSegment = await generateNextStorySegment(history, action, stats, inventory);
       
+      // CLEAR TERMINAL TO PREVENT CLUTTER
+      setLog([]);
+      addLog('system', `// LOADING SEGMENT: ${nextSegment.id.substring(0,8)}...`);
+
       // Update State
       setCurrentSegment(nextSegment);
       currentSegmentIdRef.current = nextSegment.id;
